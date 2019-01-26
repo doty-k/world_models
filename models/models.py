@@ -1,3 +1,5 @@
+# coding: utf-8
+
 # DISTRIBUTION STATEMENT A. Approved for public release: distribution unlimited.
 #
 # This material is based upon work supported by the Assistant Secretary of Defense for Research and
@@ -190,138 +192,6 @@ def vae_seg_loss(output, target, mu, log_var):
     kl_div_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
     return ce_loss, kl_div_loss
 
-# class MDNRNN(nn.Module):
-#     def __init__(self, z_size = 32, a_size = 3, n_hidden = 256, n_gaussian = 5,\
-#                  n_layers=1):
-#         super(MDNRNN, self).__init__()
-#
-#         self.z_size = z_size
-#         self.a_size = a_size
-#         self.n_hidden = n_hidden
-#         self.n_gaussian = n_gaussian
-#         self.n_layers = n_layers
-#
-#         self.lstm = nn.LSTM((z_size + a_size), n_hidden, n_layers, batch_first=False)
-#         #### batch_first implies sizing of input tensors, be aware of this when generating
-#         #### / prepping data
-#         self.fc1 = nn.Linear(n_hidden, n_gaussian*z_size)
-#         self.fc2 = nn.Linear(n_hidden, n_gaussian*z_size)
-#         self.fc3 = nn.Linear(n_hidden, n_gaussian*z_size)
-#
-#     def get_mixture(self, y):
-#         rollout_length = y.size(1)
-#         pi, mu, sigma = self.fc1(y), self.fc2(y), self.fc3(y)
-#
-#         pi = pi.view(-1, rollout_length, self.n_gaussian, self.z_size)
-#         mu = mu.view(-1, rollout_length, self.n_gaussian, self.z_size)
-#         sigma = sigma.view(-1, rollout_length, self.n_gaussian, self.z_size)
-#
-#         pi = F.softmax(pi, 2)
-#         sigma = torch.exp(sigma)
-#         return pi, mu, sigma
-#
-#     def forward(self, x, h):
-#         y,  (h, c) = self.lstm(x, h)
-#         pi, mu, sigma = self.get_mixture(y)
-#         return (pi, mu, sigma), (h, c)
-#
-#     def init_hidden(self, bsz, train):
-#         ### more sophisticated initialization for LSTM????
-#         if train:
-#             return(torch.zeros(self.n_layers, bsz, self.n_hidden).cuda(), \
-#                    torch.zeros(self.n_layers, bsz, self.n_hidden).cuda())
-#         else:
-#             return(torch.zeros(self.n_layers, bsz, self.n_hidden), \
-#                    torch.zeros(self.n_layers, bsz, self.n_hidden))
-#
-# def mdnrnn_loss(pi, mu, sigma, z):
-#     z = z.view(-1, 1, 1, 32).expand(-1, 1, 5, 32)
-#     m = torch.distributions.Normal(loc=mu, scale=sigma)
-#
-#     loss = torch.exp(m.log_prob(z))
-#     loss = torch.sum(loss * pi, dim=2)
-#     loss = -torch.log(loss)
-#     return loss.mean()
-
-# class MDNRNN(nn.Module):
-#     ''' World models m-model. A Mixture Density Network combined with a Recurrent Neural Network '''
-#     def __init__(self, z_size=32, a_size=3, n_hidden=256, n_gaussian=5, n_layers=1):
-#         ''' Initialize an MDNRNN.
-#
-#         Parameters
-#         ----------
-#         z_size : int, optional (default=32)
-#             The dimensionality of the latent vector.
-#
-#         a_size : int, optional (default=3)
-#             The number of actions.
-#
-#         n_hidden : int, optional (default=256)
-#             The dimensionality of the hidden state.
-#
-#         n_gaussian : int, optional (default=5)
-#             The assumed number of Gaussians in the mixture density distribution.
-#
-#         n_layers : int, optional (default=1)
-#             The number of layers in the LSTM.
-#         '''
-#         super().__init__()
-#         self.z_size = z_size
-#         self.n_hidden = n_hidden
-#         self.n_layers = n_layers
-#         self.n_gaussian = n_gaussian
-#         self.lstm = nn.LSTM((z_size + a_size), n_hidden, n_layers, batch_first=False)
-#         self.dense = nn.Linear(n_hidden, n_gaussian*z_size*2)
-#         self.log_pi = nn.Linear(n_hidden, n_gaussian)
-#
-#     def get_mixture(self, y):
-#         mu, log_sigma = self.dense(y).reshape(y.size(0), -1, 2).permute(2, 0, 1)
-#         log_pi = F.log_softmax(self.log_pi(y), 1)
-#
-#         # y.size(1) is the rollout length
-#         #shape = (y.size(1), -1, self.n_gaussian, self.z_size)
-#         shape = (-1, 1, self.n_gaussian, self.z_size)
-#         mu = mu.view(*shape)
-#         sigma = log_sigma.view(*shape).exp()
-#         return log_pi, mu, sigma
-#
-#     def forward(self, x, h):
-#         y, (h, c) = self.lstm(x, h)
-#         log_pi, mu, sigma = self.get_mixture(y)
-#         return (log_pi, mu, sigma), (h, c)
-#
-#     def init_hidden(self, seq_len, device):
-#         return (torch.zeros(1 ,self.n_layers, self.n_hidden).to(device),
-#                 torch.zeros(1 ,self.n_layers, self.n_hidden).to(device))
-
-# def mdnrnn_loss(log_pi, mu, sigma, z):
-#     ''' Compute the loss for the MDNRNN.
-#
-#     Parameters
-#     ----------
-#     log_pi : torch.Tensor, shape=(N, n_gaussians)
-#         The weighting over the distributions.
-#
-#     mu : torch.Tensor, shape=(seq_length, N, n_gaussians, z_size)
-#         The mean vector.
-#
-#     sigma : torch.Tensor, shape=(seq_length, N, n_gaussians, z_size)
-#         The std.
-#
-#     z : torch.Tensor, shape=(N, 32)
-#         The state vector.
-#
-#     Returns
-#     -------
-#     torch.Tensor, shape=()
-#         The loss.
-#     '''
-#     z = z.view(-1, 1, 1, 32).expand(-1, 1, 5, 32)
-#     m = torch.distributions.Normal(loc=mu, scale=sigma)
-#
-#     log_prob = m.log_prob(z)
-#     loss = torch.sum(log_prob + log_pi.view(log_pi.size(0), 1, -1, 1), dim=2)
-#     return -1*loss.mean()
 
 ## learns prior parameters for every parameter in z in the gaussian Mixture
 class MDNRNN(nn.Module):
@@ -357,8 +227,6 @@ class MDNRNN(nn.Module):
     def get_mixture(self, y):
         mu, log_sigma, log_pi = self.dense(y).reshape(y.size(0), -1, 3).permute(2, 0, 1)
 
-        # y.size(1) is the rollout length
-        # shape = (y.size(1), -1, self.n_gaussian, self.z_size)
         shape = (-1, 1, self.n_gaussian, self.z_size)
         log_pi =  F.log_softmax(log_pi.view(*shape), 2)
         mu = mu.view(*shape)
@@ -419,14 +287,13 @@ def gumbel_sample(pi, mu, sigma):
     '''
     print(pi.shape)
 
-    # pi = pi.unsqueeze_(-1).expand(mu.shape).detach().numpy()
     pi = pi.view(1, 1, 5, 1).expand(mu.shape).detach().numpy()
     mu = mu.detach().numpy()
     sigma = sigma.detach().numpy()
     rollout_length = mu.shape[0]
 
     z = np.random.gumbel(loc=0, scale=1, size=pi.shape)
-    idx = (pi + z).argmax(axis=2)   ########## CHECK AXIS WITH NEW PI SIZE ##########
+    idx = (pi + z).argmax(axis=2)
 
     I, J, K = np.ix_(np.arange(rollout_length), np.arange(pi.shape[1]), np.arange(pi.shape[3]))
     rn = np.random.randn(rollout_length, 1, 1, 32)
